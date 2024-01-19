@@ -1,0 +1,259 @@
+---
+title: "energy-data"
+format: html
+editor: visual
+---
+
+## Libraries
+
+```{r}
+packages_to_install <- c("tidytuesdayR", "dplyr", "tidyr", "ggmap", "rworldmap")
+
+for (package in packages_to_install) {
+  if (!requireNamespace(package, quietly = TRUE)) {
+    install.packages(package)
+  }
+}
+
+```
+
+```{r}
+library("tidytuesdayR")
+library("dplyr")
+library("tidyr")
+library("ggmap")
+library("rworldmap")
+library("plotly")
+library("readr")
+```
+
+## Loading Data
+
+```{r}
+# This loads the readme and all the datasets for the week of interest
+
+# Either ISO-8601 date or year/week works!
+
+# tuesdata <- tidytuesdayR::tt_load('2023-06-06')
+tuesdata <- tidytuesdayR::tt_load(2023, week = 23)
+
+owid_energy <- tuesdata$`owid-energy`
+
+# Or rad in the data manually
+
+# owid_energy <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-06-06/owid-energy.csv')
+
+
+## Data on my local
+# url <- "https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2023/2023-06-06/owid-energy.csv"
+# 
+# loc <- "data/owid-energy.csv"
+# 
+# download.file(url, destfile = loc)
+# 
+# owid_energy <- read_csv(loc)
+```
+
+## `Exploring Data`
+
+### `Column names`
+
+```{r}
+colnames(owid_energy)
+```
+
+zoom maps for different energies and different years
+
+```{r}
+nuclear_data <- owid_energy |> 
+  select(country, contains("nuclear"))
+```
+
+```{r}
+# joinCountryData2Map(nuclear_data, joinCode="NAME", nameJoinColumn="country") |> 
+# mapCountryData(nameColumnToPlot = "nuclear_consumption", mapTitle = "Nuclear Consumption by Country", colourPalette="heat", oceanCol = "#CCCCCCCC", addLegend = TRUE, aspect = 1.1, borderCol = "Black", lwd =.1)
+# # terawatt-hours
+```
+
+## greenhouse gas emissions vs gdp
+
+GDP: Total real gross domestic product, inflation-adjusted
+
+It is the standard measure of the value added created through the production of goods and services in a country during a certain period. As such, it also measures the income earned from that production, or the total amount spent on final goods and services (less imports)
+
+we need #gdp per capita for later
+
+```{r}
+gge_data <-
+  owid_energy |>
+    select(country, year, gdp, greenhouse_gas_emissions) |>
+    drop_na()
+
+gge_data |> 
+  summarise_all(n_distinct)
+```
+
+```{r}
+gge_data |> 
+  arrange(desc(gdp))
+```
+
+```{r}
+df <- 
+  gge_data |> 
+    filter(country != "World")
+df
+```
+
+```{r}
+df |> 
+  filter(country == "China") |> 
+  ggplot() + 
+  aes(x= gdp, y = greenhouse_gas_emissions, color = year) +
+  geom_point() + 
+  labs(title = "greenhouse_gas_emissions vs gdp China")
+```
+
+**Correlation Heatmaps**: Explore the relationships between different types of energy consumption, GDP, and population.
+
+```{r}
+df |> 
+  filter(country == "United States") |> 
+  ggplot() + 
+  aes(x= gdp, y = greenhouse_gas_emissions, color = year) +
+  geom_point() + 
+  labs(title = "greenhouse_gas_emissions vs gdp U.S.")
+
+```
+
+## Electricity Generation by Country
+
+```{r}
+fig <- plot_ly(
+  data = owid_energy,
+  x = ~country,
+  y = ~electricity_generation,
+  type = "bar",
+  marker = list(color = "blue")
+)
+
+fig <- fig |>  layout(title = "Electricity Generation by Country")
+
+fig
+
+```
+
+## Solar Energy Consumption Trends
+
+```{r}
+Selected_Countries <- c("Germany", "United States", "China")
+
+filtered_energy_data <- owid_energy |>
+  filter(country %in% Selected_Countries) |>
+  select(country, year, solar_consumption) |>
+  pivot_longer(cols = solar_consumption, 
+               names_to = "energy_type", values_to = "consumption")
+
+plot <- filtered_energy_data |>
+  plot_ly(x = ~year, y = ~consumption, color = ~country, 
+          type = 'scatter', mode = 'lines+markers',
+          text = ~paste("Country:", country, "<br>", "Year:", year, "<br>", "Solar Consumption:", consumption),
+          hoverinfo = "text") |>
+  layout(title = "Solar Energy Consumption Trends",
+         xaxis = list(title = "Year", tickangle = 90),
+         yaxis = list(title = "Solar Energy Consumption (TWh)"),
+         colorway = RColorBrewer::brewer.pal(3, "Dark2"))
+
+plot
+```
+
+## Renewable Energy Consumption Trends
+
+```{r}
+Selected_Country <- "Germany"
+
+filtered_energy_data <- owid_energy |>
+  filter(country == Selected_Country) |>
+  select(year, solar_consumption, wind_consumption, biofuel_consumption, other_renewable_consumption, hydro_consumption) |>
+  pivot_longer(cols = c(solar_consumption, wind_consumption, biofuel_consumption, other_renewable_consumption, hydro_consumption), 
+               names_to = "energy_type", values_to = "consumption")
+
+plot <- filtered_energy_data |>
+  plot_ly(x = ~year, y = ~consumption, color = ~energy_type, 
+          type = 'scatter', mode = 'lines+markers',
+          text = ~paste("Year:", year, "<br>", "Consumption:", consumption),
+          hoverinfo = "text") |>
+  layout(title = sprintf("Renewable Energy Consumption Trends in the %s", Selected_Country),
+         xaxis = list(title = "Year", tickangle = 90, rangeselector = list(buttons = list(list(count = 1, label = "1y", step = "year", stepmode = "backward"), list(count = 5, label = "5y", step = "year", stepmode = "backward"), list(step = "all"))), rangeslider = list(type = "date")),
+         yaxis = list(title = "Energy Consumption (TWh)"),
+         colorway = RColorBrewer::brewer.pal(5, "Dark2"))
+
+plot
+```
+
+```{r}
+Selected_Countries <- c("Germany", "United States", "China")
+
+filtered_energy_data <- owid_energy |>
+  filter(country %in% Selected_Countries) |>
+  select(country, year, solar_consumption, wind_consumption, biofuel_consumption, other_renewable_consumption, hydro_consumption) |>
+  pivot_longer(cols = -c(country, year), names_to = "energy_type", values_to = "consumption")
+
+ggplot(filtered_energy_data, aes(x = year, y = consumption, fill = energy_type)) +
+  geom_area(position = 'stack') +
+  facet_wrap(~ country) +
+  labs(title = "Stacked Area Chart of Energy Consumption by Type",
+       x = "Year",
+       y = "Energy Consumption (TWh)",
+       fill = "Energy Type") +
+  theme_minimal()
+
+```
+
+```{r}
+data_2020 <- owid_energy |> 
+  filter(year == 2018, !is.na(gdp), !is.na(electricity_demand), !is.na(population), country != "World") |> 
+  mutate(size = sqrt(population * 3e-06)) 
+
+colors <- c('#4AC6B7', '#1972A4', '#965F8A', '#FF7070', '#C61951')
+
+fig <- plot_ly(data_2020, x = ~gdp, y = ~electricity_demand, type = 'scatter', mode = 'markers',
+               marker = list(size = ~size, sizemode = 'diameter', line = list(width = 2, color = '#FFFFFF')),
+               text = ~paste('Country:', country, '<br>Electricity Demand:', electricity_demand, '<br>GDP:', gdp,
+                             '<br>Population:', population)) |> 
+  layout(title = 'Electricity Demand vs GDP',
+         xaxis = list(title = 'GDP', type = 'log'),
+         yaxis = list(title = 'Electricity Demand (TWh)'),
+         plot_bgcolor = 'rgb(243, 243, 243)')
+
+fig
+
+```
+
+### How much of the country's electricity comes from renewables?
+
+```{r}
+filtered_data <- owid_energy |> 
+  select(year, matches("_electricity$"), -other_renewable_exc_biofuel_electricity, -other_renewable_electricity, -per_capita_electricity)
+colnames(filtered_data)
+```
+
+```{r}
+
+filtered_data <- owid_energy |> 
+  filter(country == "United States") |> 
+  select(year, matches("_electricity$"), -other_renewable_exc_biofuel_electricity, -other_renewable_electricity, -per_capita_electricity)
+
+long_data <- filtered_data |> 
+  pivot_longer(cols = -year, names_to = "electricity_type", values_to = "production")
+
+fig <- plot_ly(data = long_data, x = ~year, y = ~production, color = ~electricity_type, type = 'scatter', mode = 'lines+markers') %>%
+  layout(title = "Electricity Production Over Time by Type",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Electricity Production (TWh)"))
+
+fig
+
+
+
+```
