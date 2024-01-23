@@ -31,15 +31,21 @@ library("readr")
 
 ## Loading Data
 
+There are 2 different datasets that I will work on.
+
+<https://www.energyinst.org/statistical-review/resources-and-data-downloads>
+
+<https://github.com/rfordatascience/tidytuesday/blob/master/data/2023/2023-06-06/readme.md>
+
 ```{r}
 # This loads the readme and all the datasets for the week of interest
 
 # Either ISO-8601 date or year/week works!
 
 # tuesdata <- tidytuesdayR::tt_load('2023-06-06')
-tuesdata <- tidytuesdayR::tt_load(2023, week = 23)
+# tuesdata <- tidytuesdayR::tt_load(2023, week = 23)
 
-owid_energy <- tuesdata$`owid-energy`
+# owid_energy <- tuesdata$`owid-energy`
 
 # Or rad in the data manually
 
@@ -53,7 +59,9 @@ owid_energy <- tuesdata$`owid-energy`
 # 
 # download.file(url, destfile = loc)
 # 
-# owid_energy <- read_csv(loc)
+owid_energy <- read_csv("data/owid-energy.csv")
+owid_energy_data <- read_csv("data/owid-energy-data.csv")
+stat_data <- read_csv("data/Statistical Review of World Energy Narrow File.csv")
 ```
 
 ## `Exploring Data`
@@ -299,7 +307,7 @@ fig
 
 ### OECD
 
-In dataset, the entries "Non-OECD (BP)" and "Non-OECD (EIA)" refer to groups of countries that are not part of the Organisation for Economic Co-operation and Development (OECD), as defined by two different organizations: BP and the EIA.
+In the dataset, the entries "Non-OECD (BP)" and "Non-OECD (EIA)" refer to groups of countries that are not part of the Organisation for Economic Co-operation and Development (OECD), as defined by two different organizations: BP and the EIA.
 
 ```{r}
 owid_energy |> 
@@ -308,8 +316,60 @@ owid_energy |>
     geom_bar(stat = "identity", position = "stack") +
     theme_minimal()
 
-owid_energy |>
-     filter(country %in% c("OECD (BP)", "Non-OECD (BP)") & year == "2024")
+```
+
+```{r}
+owid_energy_data |>
+     filter(country %in% c("OECD (BP)", "Non-OECD (BP)") & year == "2022")
+```
+
+```{r}
+owid_energy_data |>
+     filter(year == "2022")
+```
+
+```{r}
+owid_energy_data |> 
+  filter(country %in% c("OECD (BP)", "Non-OECD (BP)"))
+```
+
+```{r}
+stat_data |> 
+  filter(Var == "primary_ej")
+```
+
+```{r}
+primary_ej_data <- stat_data |> 
+  filter(Var == "primary_ej") |> 
+  mutate(OECD_status = ifelse(OECD == 1, "OECD", "Non-OECD")) |> 
+  filter(!is.na(OECD_status)) 
+
+primary_ej_data$OECD_status <- as.factor(primary_ej_data$OECD_status)
+
+annual_data <- primary_ej_data |> 
+  group_by(Year, OECD_status) |> 
+  summarise(Total = sum(Value, na.rm = TRUE), .groups = 'drop')
+
+ggplot(annual_data, aes(x = Year, y = Total, fill = OECD_status)) +
+  geom_bar(stat = "identity", position = "stack") +
+  theme_minimal() +
+  labs(title = "Change in primary energy (EJ) by OECD status", 
+       x = "Year", 
+       y = "Primary energy (EJ)")
+```
+
+```{r}
+Var_to_select <- c("oilcons_ej", "nuclear_ej", "coalcons_ej", "hydro_ej", "solar_ej", "wind_ej")
+
+energy_type <- stat_data |> 
+  filter(Var %in% Var_to_select)
+
+ggplot(energy_type, aes(x = Year, y = Total, fill = OECD_status)) +
+  geom_bar(stat = "identity", position = "stack") +
+  theme_minimal() +
+  labs(title = "Change in primary energy (EJ) by OECD status", 
+       x = "Year", 
+       y = "Primary energy (EJ)")
 ```
 
 ### Income Groups
