@@ -6,8 +6,10 @@ editor: visual
 
 ## Libraries
 
+Here we install all the packages needed on local, if they are not installed before.
+
 ```{r}
-packages_to_install <- c("tidytuesdayR", "dplyr", "tidyr", "ggmap", "rworldmap")
+packages_to_install <- c("tidytuesdayR", "dplyr", "tidyr", "ggmap", "rworldmap", "plotly", "readr")
 
 for (package in packages_to_install) {
   if (!requireNamespace(package, quietly = TRUE)) {
@@ -62,7 +64,9 @@ owid_energy <- tuesdata$`owid-energy`
 colnames(owid_energy)
 ```
 
-zoom maps for different energies and different years
+## Maps
+
+it is to zoom maps for different energies and maybe map them in different years.
 
 ```{r}
 nuclear_data <- owid_energy |> 
@@ -75,7 +79,7 @@ nuclear_data <- owid_energy |>
 # # terawatt-hours
 ```
 
-## greenhouse gas emissions vs gdp
+## Greenhouse gas emissions vs GDP
 
 GDP: Total real gross domestic product, inflation-adjusted
 
@@ -114,8 +118,6 @@ df |>
   labs(title = "greenhouse_gas_emissions vs gdp China")
 ```
 
-**Correlation Heatmaps**: Explore the relationships between different types of energy consumption, GDP, and population.
-
 ```{r}
 df |> 
   filter(country == "United States") |> 
@@ -142,6 +144,34 @@ fig <- fig |>  layout(title = "Electricity Generation by Country")
 fig
 
 ```
+
+### ideas
+
+with this plot I realized that in the country column we have individual countries (like Afghanistan, Albania, Algeria, etc.), regions (such as Africa, Asia, Europe), specific groupings or categories (like OECD, OPEC, High-income countries), and even historical or special entities (such as USSR, East Germany).
+
+so one idea is to compare between aforementioned groups, the other idea is to analyse different types of energy such as:
+
+```         
+biofuel
+coal
+electricity
+Primary energy
+fossil fuel
+gas 
+hydropower 
+low-carbon energy
+nuclear power
+oil
+renewable
+solar power
+wind power
+```
+
+There is a codebook explaining every column:
+
+<https://github.com/owid/energy-data/blob/master/owid-energy-codebook.csv>
+
+lots of different fun analyses can be made!
 
 ## Solar Energy Consumption Trends
 
@@ -230,6 +260,8 @@ fig
 
 ```
 
+in above plot, what is needed to be done, is to just choose a fee countries and compare them. becasue nothing is clear from this plot.
+
 ### How much of the country's electricity comes from renewables?
 
 ```{r}
@@ -257,3 +289,48 @@ fig
 
 
 ```
+
+## Groups
+
+```{r}
+ unique_countries <- unique(owid_energy$country) 
+ unique_countries
+```
+
+### OECD
+
+In dataset, the entries "Non-OECD (BP)" and "Non-OECD (EIA)" refer to groups of countries that are not part of the Organisation for Economic Co-operation and Development (OECD), as defined by two different organizations: BP and the EIA.
+
+```{r}
+owid_energy |> 
+  filter(country %in% c("OECD (EIA)", "Non-OECD (EIA)")) |> 
+  ggplot(aes(x = year, y = energy_cons_change_pct, fill = country)) +
+    geom_bar(stat = "identity", position = "stack") +
+    theme_minimal()
+
+owid_energy |>
+     filter(country %in% c("OECD (BP)", "Non-OECD (BP)") & year == "2024")
+```
+
+### Income Groups
+
+in the owid-energy dataset, in country column we have different income groups such as:
+
+```         
+    "L": "Low-income countries"
+    "H": "High-income countries"
+    "UM": "Upper-middle-income countries"
+    "LM": "Lower-middle-income countries"
+```
+
+source of pyhton code that did this grouping for owid data: <https://github.com/owid/etl/blob/master/etl/steps/data/garden/wb/2023-04-30/income_groups.py>
+
+```{r}
+owid_energy |> 
+   filter(country %in% c("Upper-middle-income countries", 
+                        "Low-income countries", 
+                        "High-income countries", 
+                        "Lower-middle-income countries"))
+```
+
+**Correlation Heatmaps**: Explore the relationships between different types of energy consumption, GDP, and population.
